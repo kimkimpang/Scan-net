@@ -1,0 +1,1214 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
+    <title>WMS 扫码系统 (PDA 手机版)</title>
+    <style>
+        /* =========================================
+           📱 移动端 PDA 基础屏幕样式优化
+        ========================================= */
+        body { font-family: -apple-system, monospace; margin: 0; padding: 6px; background: #f4f6f9; padding-bottom: 100px; }
+        
+        /* 1. 紧凑型仪表盘 */
+        .dashboard { background: linear-gradient(135deg, #0062E6, #33AEFF); color: white; padding: 10px; border-radius: 8px; text-align: center; margin-bottom: 8px; position: relative; display: flex; align-items: baseline; justify-content: center; gap: 10px; flex-wrap: wrap;}
+        .dashboard.history-mode { background: linear-gradient(135deg, #607d8b, #90a4ae); }
+        .total-number { font-size: 26px; font-weight: bold; margin: 0 5px;}
+        
+        .btn-settings { position: absolute; top: 5px; right: 5px; background: rgba(0,0,0,0.2); border: none; color: white; font-size: 16px; padding: 4px 8px; border-radius: 6px; cursor: pointer; }
+        .btn-settings:active { background: rgba(0,0,0,0.4); }
+
+        /* 2. 紧凑型输入框 */
+        .meta-input-group { display: flex; gap: 6px; margin-bottom: 8px; }
+        .input-pallet { width: 35%; padding: 8px; border: 2px solid #ddd; border-radius: 6px; font-size: 14px; text-align: center; font-weight: bold; }
+        .input-product { width: 65%; padding: 8px; border: 2px solid #ddd; border-radius: 6px; font-size: 14px; font-weight: bold; }
+        .input-pallet:focus, .input-product:focus { border-color: #0062E6; outline: none; background: #fff; }
+
+        .input-group { display: flex; gap: 6px; margin-bottom: 8px; }
+        #barcodeInput { flex: 1; padding: 10px; font-size: 16px; border: 2px solid #ddd; border-radius: 6px; outline: none; }
+        #barcodeInput:focus { border-color: #0062E6; background: #fff; }
+        .btn-mic { padding: 10px 12px; background: #fff; border: 2px solid #ddd; border-radius: 6px; font-size: 18px; cursor: pointer; transition: all 0.15s; line-height: 1; }
+        .btn-mic:active, .btn-mic:focus { border-color: #0062E6; outline: none; }
+        .btn-mic.listening { background: #dc3545; border-color: #dc3545; color: #fff; animation: micPulse 1s infinite; }
+        @keyframes micPulse { 0%,100% { box-shadow: 0 0 0 0 rgba(220,53,69,0.7); } 50% { box-shadow: 0 0 0 8px rgba(220,53,69,0); } }
+        .voice-status { display: none; padding: 6px 10px; background: #fff3cd; border: 1px solid #ffc107; border-radius: 6px; margin-bottom: 6px; font-size: 13px; color: #856404; }
+        .voice-status.show { display: block; }
+        .voice-status .vs-heard { font-weight: bold; color: #0062E6; }
+        .btn-confirm { background: #0062E6; color: white; border: none; border-radius: 6px; padding: 0 15px; font-weight: bold; font-size: 14px; cursor: pointer; white-space: nowrap;}
+        .btn-confirm:active { background: #004a9e; }
+
+        /* 3. 数据列表优化 */
+        .list-container { background: white; border-radius: 6px; overflow: hidden; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        .list-header { display: flex; background: #eee; padding: 8px 10px; font-weight: bold; font-size: 12px; color: #555; }
+        .list-header span:nth-child(1) { flex: 0 0 50px; text-align: left; } 
+        .list-header span:nth-child(2) { flex: 1; text-align: right; padding-right: 15px; } 
+        .list-header span:nth-child(3) { flex: 0 0 45px; text-align: right; } 
+
+        /* 动态高度，适配不同大小的手机屏幕 */
+        #dataList { list-style: none; padding: 0; margin: 0; max-height: calc(100vh - 230px); overflow-y: auto; }
+        .list-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 10px; border-bottom: 1px solid #f0f0f0; font-size: 15px; }
+        .list-item:nth-child(even) { background: #fafafa; }
+        .item-index { flex: 0 0 50px; color: #d32f2f; font-weight: bold; text-align: left; font-size: 13px;}
+        .item-weight { flex: 1; text-align: right; font-weight: bold; padding-right: 15px; color: #333; }
+        .item-action { flex: 0 0 45px; text-align: right; }
+        .btn-delete { background: #ffebee; color: #d32f2f; border: 1px solid #ffcdd2; padding: 4px 8px; border-radius: 4px; font-size: 12px; }
+        
+        /* 4. 底部 2x2 网格按钮布局，拒绝拥挤 */
+        .footer-btns { position: fixed; bottom: 0; left: 0; right: 0; padding: 8px; background: white; border-top: 1px solid #ddd; z-index: 100; box-shadow: 0 -2px 10px rgba(0,0,0,0.1); 
+            display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+        .btn { padding: 10px 0; border: none; border-radius: 6px; font-weight: bold; color: white; font-size: 15px; display: flex; align-items: center; justify-content: center; gap: 5px; }
+        .btn-print { background: #28a745; } .btn-save { background: #007bff; } .btn-history { background: #6c757d; } .btn-clear { background: #dc3545; }
+
+        /* 5. 全屏弹窗，适合小屏幕滑动 */
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #f4f6f9; z-index: 200; }
+        .modal-content { background: white; margin: 0; width: 100%; height: 100%; border-radius: 0; display: flex; flex-direction: column; }
+        .modal-header { padding: 12px 15px; background: #eee; font-weight: bold; display: flex; justify-content: space-between; align-items: center; font-size: 16px;}
+        .modal-body { padding: 0; overflow-y: auto; flex: 1; }
+        .modal-footer { padding: 10px; border-top: 1px solid #ddd; display: flex; justify-content: space-between; align-items: center; background: #fff; flex-wrap: wrap; gap: 5px;}
+        
+        .backup-section { display:flex; justify-content:space-between; margin-top:10px; padding-top:10px; border-top:1px dashed #ccc; }
+        .btn-backup { background: #6f42c1; color: white; border:none; padding:8px; border-radius:4px; font-size:12px; flex:1; margin-right:5px;}
+        .btn-restore { background: #fd7e14; color: white; border:none; padding:8px; border-radius:4px; font-size:12px; flex:1; margin-left:5px;}
+
+        /* 搜索 & 筛选区 */
+        .search-filter-bar { padding: 8px; background:#fff; border-bottom:1px solid #ddd; display:flex; flex-direction:column; gap:6px; }
+        .search-row { display:flex; gap:6px; align-items:center; }
+        .search-input { flex:1; padding:8px; border:2px solid #ddd; border-radius:6px; font-size:14px; outline:none; color:#333; background:#fff; }
+        .search-input:focus { border-color:#0062E6; }
+        .btn-clear-search { background:#6c757d; color:#fff; border:none; padding:8px 10px; border-radius:6px; font-size:12px; white-space:nowrap; }
+        .filter-row { display:flex; gap:6px; align-items:center; flex-wrap:wrap; }
+        .filter-row select, .filter-row input[type=date] { padding:6px; border:1px solid #ccc; border-radius:5px; font-size:13px; background:#fff; color:#333; flex:1; min-width:0; }
+        .filter-label { font-size:12px; color:#555; font-weight:bold; white-space:nowrap; }
+        .stats-row { font-size:12px; color:#666; padding:4px 2px; border-top:1px dashed #eee; padding-top:6px; }
+        .stats-row b { color:#0062E6; }
+        /* 历史记录条目 - 强制文字颜色 */
+        .history-item { color: #333; }
+        .history-item .history-info { color: #333; }
+
+        .settings-section { padding: 10px; }
+        .settings-group { margin-bottom: 15px; background: #f8f9fa; padding: 10px; border-radius: 6px; border: 1px solid #eee; }
+        .settings-title { font-weight: bold; margin-bottom: 8px; display: block; color: #333; border-bottom: 1px solid #ddd; padding-bottom: 5px; font-size: 14px;}
+        .setting-item { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-size: 14px; }
+        .setting-input { width: 60px; padding: 4px; text-align: center; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; }
+        
+        /* 开关组件缩小 */
+        .switch { position: relative; display: inline-block; width: 44px; height: 22px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .4s; border-radius: 22px; }
+        .slider:before { position: absolute; content: ""; height: 14px; width: 14px; left: 4px; bottom: 4px; background-color: white; transition: .4s; border-radius: 50%; }
+        input:checked + .slider { background-color: #2196F3; }
+        input:checked + .slider:before { transform: translateX(22px); }
+
+        #toastMsg { position: fixed; top: 40%; left: 50%; transform: translate(-50%, -50%); padding: 15px 20px; border-radius: 8px; color: white; font-weight: bold; font-size: 18px; text-align: center; z-index: 999; display: none; box-shadow: 0 5px 15px rgba(0,0,0,0.3); min-width: 150px; white-space: nowrap;}
+        .toast-success { background: rgba(40, 167, 69, 0.95); } .toast-error { background: rgba(220, 53, 69, 0.95); } .toast-warning { background: rgba(255, 193, 7, 0.95); color: #000; }
+        @keyframes flashGreen { 0% { background-color: rgba(40, 167, 69, 0.5); } 100% { background-color: transparent; } }
+        .scan-success-anim { animation: flashGreen 0.5s ease-out; }
+
+        /* =========================================
+           🖨️打印专属样式
+        ========================================= */
+        #batchPrintContainer { display: none; }
+        @media print {
+            @page { margin: 1.0cm; }
+            body { padding: 0; color: #000; background: white; font-family: monospace; }
+            .no-print, .input-group, .footer-btns, .list-header, .dashboard, .list-container, .modal, #toastMsg, .btn-settings { display: none !important; }
+
+            #batchPrintContainer {
+                display: flex !important;
+                flex-direction: row;
+                flex-wrap: wrap;
+                align-items: stretch;
+                gap: 4px;
+                width: 100%;
+            }
+
+            .batch-record {
+                flex: 0 0 19%;
+                min-width: 18%;
+                border: 1px solid #000;
+                box-sizing: border-box;
+                padding: 4px;
+                display: flex;
+                flex-direction: column;
+                page-break-inside: avoid;
+                break-inside: avoid;
+            }
+
+            .batch-header {
+                border-bottom: 1px solid #000;
+                padding-bottom: 4px;
+                margin-bottom: 4px;
+                font-size: 10pt;
+                font-weight: bold;
+                line-height: 1.2;
+                word-break: break-word;
+            }
+
+            .batch-list {
+                flex: 1;
+                margin-bottom: 6px;
+            }
+
+            .batch-item {
+                display: block;
+                width: 100%;
+                text-align: left;
+                white-space: nowrap;
+                line-height: 1.25;
+                break-inside: avoid;
+            }
+
+            .batch-footer {
+                border-top: 1px solid #000;
+                padding-top: 4px;
+                margin-top: auto;
+            }
+
+            .footer-totals { text-align: right; line-height: 1.4; }
+            .s-label { font-size: 10pt; font-weight: bold; }
+            .s-val { font-size: 12pt; font-weight: bold; }
+            .s-unit { font-size: 10pt; font-weight: normal; }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="toastMsg"></div>
+    <input type="file" id="restoreFile" style="display:none" accept=".json" onchange="processRestore(this)">
+
+    <div class="dashboard" id="flashArea">
+        <button class="btn-settings" onclick="openSettings()">⚙️</button>
+        <div style="font-size:13px; color:#e0f0ff;">总重:</div>
+        <div class="total-number"><span id="displayTotal">0.00</span><span style="font-size:14px; font-weight:normal;">kg</span></div>
+        <div style="font-size:14px; border-left: 1px solid rgba(255,255,255,0.3); padding-left: 10px;"><span id="displayCount" style="font-weight:bold; font-size: 18px;">0</span> 件</div>
+        <div id="historyTag" style="display:none; width:100%; font-size:12px; margin-top:4px; padding-top:4px; border-top:1px dashed rgba(255,255,255,0.3);">📜 历史查看模式</div>
+    </div>
+
+    <div class="meta-input-group no-print">
+        <input type="text" id="palletInput" class="input-pallet" placeholder="板号" enterkeyhint="next">
+        <input type="text" id="productInput" class="input-product" placeholder="货物名称" enterkeyhint="next">
+    </div>
+
+    <div class="input-group no-print">
+        <input type="text" id="barcodeInput" placeholder="请扫描条码..." inputmode="decimal" enterkeyhint="go">
+        <button type="button" id="micBtn" class="btn-mic" onclick="toggleVoiceInput()" aria-label="语音输入">🎙️</button>
+        <button type="button" class="btn-confirm" onclick="triggerSubmit()">确认</button>
+    </div>
+    <div id="voiceStatus" class="voice-status no-print"></div>
+
+    <div class="list-container">
+        <div class="list-header no-print">
+            <span>序号</span><span>重量</span><span>操作</span>
+        </div>
+        <ul id="dataList"></ul>
+    </div>
+
+    <div id="batchPrintContainer"></div>
+
+    <div class="footer-btns no-print" id="mainBtns">
+        <button class="btn btn-clear" onclick="clearCurrent()">🗑️清空</button>
+        <button class="btn btn-history" onclick="showHistory()">📜 历史</button>
+        <button class="btn btn-save" onclick="saveAndNew()">💾 存档</button>
+        <button class="btn btn-print" onclick="doPrintCurrent()">🖨️打印</button>
+    </div>
+
+    <div class="footer-btns no-print" id="historyViewBtns" style="display:none; grid-template-columns: 1fr 2fr;">
+        <button class="btn btn-history" onclick="exitHistoryView()" style="background:#666;">⬅️ 返回</button>
+        <button class="btn btn-print" onclick="doPrintCurrent()">🖨️补打此单</button>
+    </div>
+
+    <div id="settingsModal" class="modal no-print">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span>⚙️ 系统设置</span>
+                <button onclick="closeSettings()" style="border:none;background:none;font-size:20px;">✖</button>
+            </div>
+            <div class="modal-body settings-section">
+                <div class="settings-group">
+                    <span class="settings-title">🖨️打印设置</span>
+                    <div class="setting-item"><span>字体大小 (pt):</span><input type="number" id="set_fontsize" class="setting-input" value="12"></div>
+                </div>
+                <div class="settings-group">
+                    <span class="settings-title">⚖️ 重量范围 (KG)</span>
+                    <div class="setting-item"><span>最小重量:</span><input type="number" id="set_min" class="setting-input" value="0.5"></div>
+                    <div class="setting-item"><span>最大重量:</span><input type="number" id="set_max" class="setting-input" value="100"></div>
+                </div>
+                <div class="settings-group">
+                    <span class="settings-title">⚡ 快捷输入</span>
+                    <div class="setting-item"><span>启用快捷输入</span><label class="switch"><input type="checkbox" id="set_quickinput" checked><span class="slider"></span></label></div>
+                    <div class="setting-item"><span>小数位数:</span>
+                        <select id="set_decimal" class="setting-input" style="width:auto;">
+                            <option value="2">2 位 (2289 → 22.89)</option>
+                            <option value="3">3 位 (22890 → 22.890)</option>
+                        </select>
+                    </div>
+                    <div style="font-size:11px; color:#666; padding:4px 2px; line-height:1.4;">
+                        💡 开启后，手动输入纯数字会按设定的小数位自动加点。<br>
+                        也支持直接输入小数（如 22.89）和短整数（如 22）。
+                    </div>
+                </div>
+                <div class="settings-group">
+                    <span class="settings-title">🎙️ 语音输入 (中文)</span>
+                    <div class="setting-item"><span>启用语音输入</span><label class="switch"><input type="checkbox" id="set_voice" checked><span class="slider"></span></label></div>
+                    <div class="setting-item"><span>识别模式:</span>
+                        <select id="set_voicemode" class="setting-input" style="width:auto;">
+                            <option value="single">单次 (说一个识别一个)</option>
+                            <option value="continuous">连续 (一直听直到关闭)</option>
+                        </select>
+                    </div>
+                    <div style="font-size:11px; color:#666; padding:4px 2px; line-height:1.4;">
+                        💡 单次：按🎙️说一个数字，自动提交后停止<br>
+                        💡 连续：按🎙️一直听，每识别到一个数字自动提交，再按一次🎙️停止<br>
+                        🗣️ 支持："22.89" / "22点89" / "二十二点八九" / "两千两百八十九" 等<br>
+                        ⚠️ <b>10.xx / 20.xx 必须逐位读</b>："幺零点八九" → 10.89 / "二零点八九" → 20.89<br>
+                        ⚠️ 单说"二十"或"十"会被识别为 24 或 14（防止漏听"四"字）<br>
+                        🎯 已加强同音字识别：例如"喝酒"自动识别为"二九"，"屋"识别为"五"等
+                    </div>
+                </div>
+                <div class="settings-group">
+                    <span class="settings-title">🌐 识别规则</span>
+                    <div class="setting-item"><span>GS1 通用码</span><label class="switch"><input type="checkbox" id="rule_gs1" checked><span class="slider"></span></label></div>
+                    <div class="setting-item"><span>新西兰 ME124</span><label class="switch"><input type="checkbox" id="rule_nz" checked><span class="slider"></span></label></div>
+                    <div class="setting-item"><span>英国码 (42位)</span><label class="switch"><input type="checkbox" id="rule_uk" checked><span class="slider"></span></label></div>
+                    <div class="setting-item"><span>巴西/墨西哥</span><label class="switch"><input type="checkbox" id="rule_latam" checked><span class="slider"></span></label></div>
+                    <div class="setting-item"><span>超市零售码</span><label class="switch"><input type="checkbox" id="rule_market" checked><span class="slider"></span></label></div>
+                </div>
+            </div>
+            <div class="modal-footer" style="justify-content: flex-end;">
+                <button class="btn btn-save" onclick="saveSettings()" style="width:100%">💾 保存并生效</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="historyModal" class="modal no-print">
+        <div class="modal-content">
+            <div class="modal-header"><span>📦 历史记录</span><button onclick="closeHistory()" style="border:none;background:none;font-size:20px;">✖</button></div>
+            <div style="padding:8px; background:#f8f9fa; border-bottom:1px solid #ddd;">
+                <div style="display:flex;">
+                    <button class="btn-backup" onclick="backupData()">📤 备份</button>
+                    <button class="btn-restore" onclick="document.getElementById('restoreFile').click()">📥 恢复</button>
+                </div>
+            </div>
+            <!-- 🔍 搜索 & 筛选区 -->
+            <div class="search-filter-bar">
+                <div class="search-row">
+                    <input type="text" id="histSearchInput" class="search-input" placeholder="🔍 搜索板号 / 货名..." oninput="renderHistoryList()">
+                    <button class="btn-clear-search" onclick="clearHistFilters()">清除</button>
+                </div>
+                <div class="filter-row">
+                    <span class="filter-label">排序:</span>
+                    <select id="histSortBy" onchange="renderHistoryList()">
+                        <option value="time_desc">时间 ↓ (最新)</option>
+                        <option value="time_asc">时间 ↑ (最旧)</option>
+                        <option value="pallet_asc">板号 A-Z</option>
+                        <option value="product_asc">货名 A-Z</option>
+                    </select>
+                </div>
+                <div class="stats-row" id="histStatsRow"></div>
+            </div>
+            <div class="modal-body" id="historyListBody" style="padding-bottom: 20px;"></div>
+            
+            <div class="modal-footer" style="justify-content:space-between; flex-wrap: nowrap;">
+                <button onclick="toggleSelectAll()" style="background:#6c757d; color:white; border:none; padding:10px 8px; border-radius:4px; font-weight:bold; white-space:nowrap; font-size:13px;">☑️全选</button>
+                <div style="display:flex; gap:4px; flex:1; justify-content:flex-end;">
+                    <button onclick="exportToExcel()" style="background:#17a2b8; color:white; border:none; padding:10px 8px; border-radius:4px; white-space:nowrap; font-size:13px;">📥CSV</button>
+                    <button onclick="downloadSelectedPDF()" style="background:#e83e8c; color:white; border:none; padding:10px 8px; border-radius:4px; white-space:nowrap; font-size:13px; font-weight:bold;">📄PDF</button>
+                    <button onclick="deleteSelected()" style="background:#dc3545; color:white; border:none; padding:10px 8px; border-radius:4px; white-space:nowrap; font-size:13px;">🗑️删</button>
+                    <button onclick="printSelectedBatch()" style="background:#28a745; color:white; border:none; padding:10px 8px; border-radius:4px; font-weight:bold; white-space:nowrap; font-size:13px;">🖨️打印</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentLogs = [], historyStorage = [], viewingHistoryId = null;
+        const KEY_CURRENT = 'wms_cur_v36', KEY_HISTORY = 'wms_hist_v36', KEY_SETTINGS = 'wms_settings_v36';
+
+        let appSettings = { printFontSize: 12, minWeight: 0.5, maxWeight: 100, quickInput: true, decimalPlaces: 2, voiceEnabled: true, voiceMode: 'single', rules: { gs1: true, nz: true, uk: true, latam: true, market: true } };
+
+        let audioCtx;
+        function initAudio() { if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }
+        function beep(freq, dur, type) {
+            initAudio(); if (audioCtx.state === 'suspended') audioCtx.resume();
+            const osc = audioCtx.createOscillator(); const gain = audioCtx.createGain();
+            osc.type = type; osc.frequency.value = freq; osc.connect(gain); gain.connect(audioCtx.destination);
+            osc.start(); setTimeout(() => osc.stop(), dur);
+        }
+        function playSuccess() { beep(880, 100, 'sine'); } 
+        function playError() { beep(150, 300, 'sawtooth'); }
+        function playWarning() { beep(400, 200, 'square'); }
+
+        window.onload = function() { 
+            loadData(); loadSettings(); renderUI(); 
+            document.body.addEventListener('click', (e) => { 
+                initAudio();
+                const isInput = e.target.tagName === 'INPUT';
+                const isBtn = e.target.tagName === 'BUTTON';
+                const isModal = document.getElementById('historyModal').contains(e.target) || document.getElementById('settingsModal').contains(e.target);
+                if (!isInput && !isBtn && !isModal && !viewingHistoryId) {
+                    setTimeout(()=>document.getElementById('barcodeInput').focus(), 100);
+                }
+            });
+            document.getElementById('palletInput').addEventListener('keydown', (e) => { if(e.key==='Enter') document.getElementById('productInput').focus(); });
+            document.getElementById('productInput').addEventListener('keydown', (e) => { if(e.key==='Enter') document.getElementById('barcodeInput').focus(); });
+            
+            document.getElementById('barcodeInput').addEventListener('keydown', (e) => { 
+                if (e.key === 'Enter' || e.keyCode === 13 || e.key === 'Go') { 
+                    e.preventDefault(); 
+                    triggerSubmit(); 
+                } 
+            });
+
+            let scanTimeout = null;
+            document.getElementById('barcodeInput').addEventListener('input', function(e) {
+                const val = this.value.trim().replace(/\s/g, '');
+                if (val.length >= 15) {
+                    clearTimeout(scanTimeout);
+                    scanTimeout = setTimeout(() => {
+                        triggerSubmit();
+                    }, 30); 
+                }
+            });
+        };
+
+        function normalizeSettings() {
+            if (!appSettings || typeof appSettings !== 'object') appSettings = {};
+            if (!appSettings.rules || typeof appSettings.rules !== 'object') appSettings.rules = {};
+            appSettings.printFontSize = Number.isFinite(parseInt(appSettings.printFontSize, 10)) ? parseInt(appSettings.printFontSize, 10) : 12;
+            appSettings.minWeight = Number.isFinite(parseFloat(appSettings.minWeight)) ? parseFloat(appSettings.minWeight) : 0.5;
+            appSettings.maxWeight = Number.isFinite(parseFloat(appSettings.maxWeight)) ? parseFloat(appSettings.maxWeight) : 100;
+            if (appSettings.maxWeight < appSettings.minWeight) {
+                const temp = appSettings.minWeight;
+                appSettings.minWeight = appSettings.maxWeight;
+                appSettings.maxWeight = temp;
+            }
+            appSettings.rules.gs1 = appSettings.rules.gs1 !== false;
+            appSettings.rules.nz = appSettings.rules.nz !== false;
+            appSettings.rules.uk = appSettings.rules.uk !== false;
+            appSettings.rules.latam = appSettings.rules.latam !== false;
+            appSettings.rules.market = appSettings.rules.market !== false;
+            // 快捷输入: 默认开启
+            appSettings.quickInput = appSettings.quickInput !== false;
+            // 小数位数: 仅允许 2 或 3, 默认 2
+            const dp = parseInt(appSettings.decimalPlaces, 10);
+            appSettings.decimalPlaces = (dp === 2 || dp === 3) ? dp : 2;
+            // 语音输入: 默认开启
+            appSettings.voiceEnabled = appSettings.voiceEnabled !== false;
+            // 语音模式: 'single' | 'continuous'
+            appSettings.voiceMode = (appSettings.voiceMode === 'continuous') ? 'continuous' : 'single';
+        }
+        function loadSettings() {
+            const s = localStorage.getItem(KEY_SETTINGS); if (s) { appSettings = JSON.parse(s); }
+            normalizeSettings();
+            document.getElementById('set_fontsize').value = appSettings.printFontSize;
+            document.getElementById('set_min').value = appSettings.minWeight; document.getElementById('set_max').value = appSettings.maxWeight;
+            document.getElementById('rule_gs1').checked = appSettings.rules.gs1; document.getElementById('rule_nz').checked = appSettings.rules.nz;
+            document.getElementById('rule_uk').checked = appSettings.rules.uk; document.getElementById('rule_latam').checked = appSettings.rules.latam;
+            document.getElementById('rule_market').checked = appSettings.rules.market;
+            const qi = document.getElementById('set_quickinput'); if (qi) qi.checked = appSettings.quickInput;
+            const dp = document.getElementById('set_decimal'); if (dp) dp.value = String(appSettings.decimalPlaces);
+            const ve = document.getElementById('set_voice'); if (ve) ve.checked = appSettings.voiceEnabled;
+            const vm = document.getElementById('set_voicemode'); if (vm) vm.value = appSettings.voiceMode;
+            updateMicButtonVisibility();
+        }
+        function saveSettings() {
+            appSettings.printFontSize = parseInt(document.getElementById('set_fontsize').value, 10);
+            appSettings.minWeight = parseFloat(document.getElementById('set_min').value);
+            appSettings.maxWeight = parseFloat(document.getElementById('set_max').value);
+            appSettings.rules.gs1 = document.getElementById('rule_gs1').checked; appSettings.rules.nz = document.getElementById('rule_nz').checked;
+            appSettings.rules.uk = document.getElementById('rule_uk').checked; appSettings.rules.latam = document.getElementById('rule_latam').checked;
+            appSettings.rules.market = document.getElementById('rule_market').checked;
+            const qi = document.getElementById('set_quickinput'); if (qi) appSettings.quickInput = qi.checked;
+            const dp = document.getElementById('set_decimal'); if (dp) appSettings.decimalPlaces = parseInt(dp.value, 10);
+            const ve = document.getElementById('set_voice'); if (ve) appSettings.voiceEnabled = ve.checked;
+            const vm = document.getElementById('set_voicemode'); if (vm) appSettings.voiceMode = vm.value;
+            normalizeSettings();
+            document.getElementById('set_fontsize').value = appSettings.printFontSize;
+            document.getElementById('set_min').value = appSettings.minWeight;
+            document.getElementById('set_max').value = appSettings.maxWeight;
+            updateMicButtonVisibility();
+            localStorage.setItem(KEY_SETTINGS, JSON.stringify(appSettings)); closeSettings(); showFeedback("Settings updated", "success"); setTimeout(()=>document.getElementById('barcodeInput').focus(), 100);
+        }
+        function openSettings() { document.getElementById('settingsModal').style.display = 'flex'; }
+        function closeSettings() { document.getElementById('settingsModal').style.display = 'none'; }
+
+        // =========================================
+        // 核心：全部条码解析规则 (包含最新版本)
+        // =========================================
+        function isWeightInRange(weight) {
+            if (!Number.isFinite(weight)) return false;
+            const min = Number.isFinite(parseFloat(appSettings.minWeight)) ? parseFloat(appSettings.minWeight) : 0.5;
+            const max = Number.isFinite(parseFloat(appSettings.maxWeight)) ? parseFloat(appSettings.maxWeight) : 100;
+            return weight >= min && weight <= max;
+        }
+
+        // ========================================
+        // 严格 GS1-128 解析器 (按 AI 结构扫描, 避免误判)
+        // ========================================
+        const _GS1_AIS_FIXED_2 = { '00':18, '01':14, '02':14, '11':6, '12':6, '13':6, '15':6, '17':6 };
+        const _GS1_AIS_VAR_2 = { '10':20, '21':20, '22':20, '30':8 };
+        const _GS1_AIS_FIXED_4 = { '8005':6, '422':3, '424':3, '426':3 };
+
+        function _gs1ReadAI(s, pos) {
+            if (pos >= s.length) return null;
+            const c4 = s.substring(pos, pos + 4);
+            // 重量/尺寸: 31XY (kg) 或 32XY (lb) 等, 数据 6 位定长, Y=小数位
+            if (/^31[0-6]\d$/.test(c4) || /^32[0-6]\d$/.test(c4)) {
+                return { ai: c4, dataLen: 6, fixed: true,
+                    isWeightKg: c4.startsWith('310'),
+                    isWeightLb: c4.startsWith('320'),
+                    decimals: parseInt(c4.charAt(3), 10) };
+            }
+            if (_GS1_AIS_FIXED_4[c4] !== undefined) return { ai: c4, dataLen: _GS1_AIS_FIXED_4[c4], fixed: true };
+            const c2 = s.substring(pos, pos + 2);
+            if (_GS1_AIS_FIXED_2[c2] !== undefined) return { ai: c2, dataLen: _GS1_AIS_FIXED_2[c2], fixed: true };
+            if (_GS1_AIS_VAR_2[c2] !== undefined) return { ai: c2, dataLen: _GS1_AIS_VAR_2[c2], fixed: false };
+            return null;
+        }
+
+        function parseGS1Strict(rawCode) {
+            if (!rawCode) return null;
+            // 去括号 (人可读形式)
+            let s = String(rawCode).replace(/[()]/g, '');
+            const FNC1 = '\x1d';
+            let pos = 0;
+            let firstWeightKg = null;
+            let count = 0;
+            const maxIter = 50;
+
+            while (pos < s.length && count < maxIter) {
+                count++;
+                if (s.charAt(pos) === FNC1) { pos++; continue; }
+                const aiInfo = _gs1ReadAI(s, pos);
+                if (!aiInfo) break;
+                pos += aiInfo.ai.length;
+                let data;
+                if (aiInfo.fixed) {
+                    if (pos + aiInfo.dataLen > s.length) break;
+                    data = s.substring(pos, pos + aiInfo.dataLen);
+                    pos += aiInfo.dataLen;
+                } else {
+                    const endFnc1 = s.indexOf(FNC1, pos);
+                    const maxEnd = pos + aiInfo.dataLen;
+                    const end = (endFnc1 === -1) ? Math.min(s.length, maxEnd) : Math.min(endFnc1, maxEnd);
+                    data = s.substring(pos, end);
+                    pos = end;
+                    if (s.charAt(pos) === FNC1) pos++;
+                }
+                if (firstWeightKg === null && (aiInfo.isWeightKg || aiInfo.isWeightLb) && /^\d+$/.test(data)) {
+                    const num = parseInt(data, 10);
+                    if (Number.isFinite(num)) {
+                        let w = num / Math.pow(10, aiInfo.decimals);
+                        if (aiInfo.isWeightLb) w = w * 0.45359237;
+                        firstWeightKg = w;
+                    }
+                }
+            }
+            return firstWeightKg;
+        }
+
+        function parseBarcodeValue(code) {
+            if (!code) return null; let valStr = code.trim().replace(/\s/g, '');
+
+            // ⚡ 快捷输入: 纯数字、长度合理且不含小数点 → 按设定小数位自动加点
+            // 例: 设 2 位小数, 输入 "2289" → 22.89; 输入 "150" → 1.50
+            //     设 3 位小数, 输入 "22890" → 22.890
+            // 解析结果必须落在限重范围内, 否则视为无效
+            if (appSettings.quickInput && /^\d+$/.test(valStr) && valStr.length >= 1 && valStr.length <= 6) {
+                const dp = appSettings.decimalPlaces || 2;
+                // 规则: 长度 > 小数位数 时按快捷输入解析; 长度 <= 小数位数 时按整数 kg
+                if (valStr.length > dp) {
+                    const w = parseInt(valStr, 10) / Math.pow(10, dp);
+                    if (isWeightInRange(w)) return w;
+                } else {
+                    // 长度太短 (如 dp=2 时 "5"、"22") → 当作整数 kg
+                    const w = parseInt(valStr, 10);
+                    if (isWeightInRange(w)) return w;
+                }
+            }
+
+            if (!isNaN(valStr) && valStr.length < 8 && valStr.includes('.')) { const w = parseFloat(valStr); return isWeightInRange(w) ? w : null; }
+            if (!isNaN(valStr) && valStr.length < 5) { const w = parseFloat(valStr); return isWeightInRange(w) ? w : null; }
+            const MIN = appSettings.minWeight; const MAX = appSettings.maxWeight;
+
+            // 🔥 西班牙工厂特征抓取 (0890 或 8320 开头)
+            const spainMatch = valStr.match(/(?:0890|8320)\d{9}(\d{4})/);
+            if (spainMatch) {
+                const weight = parseInt(spainMatch[1]) / 100;
+                if (weight >= MIN && weight <= MAX) return weight;
+            }
+
+            // 🔥 西班牙 FORTUNE PIG 及同类标签 (4299 或 3620 开头)
+            const customSpainMatch = valStr.match(/^(?:4299|3620)\d{8}(\d{5})/);
+            if (customSpainMatch) {
+                const weight = parseInt(customSpainMatch[1]) / 100;
+                if (weight >= MIN && weight <= MAX) return weight;
+            }
+
+            if (appSettings.rules.latam) {
+                if (/^\d{12}$/.test(valStr) && valStr.endsWith('00')) { let w = parseInt(valStr.substring(6, 10)) / 100; if(w >= MIN && w <= MAX) return w; }
+                if (valStr.startsWith('2800') && valStr.length > 40) { let w = parseInt(valStr.substring(25, 29)) / 100; if(w >= MIN && w <= MAX) return w; }
+            }
+            if (appSettings.rules.market) {
+                if (valStr.length === 18 && valStr.startsWith('2') && /^\d+$/.test(valStr)) { const w = parseInt(valStr.substring(12, 17))/1000; if (w >= MIN && w <= MAX) return w; }
+            }
+            if (appSettings.rules.gs1) {
+                // 严格 GS1-128 结构解析: 按 AI 表逐位扫描, 避免误把 GTIN 中段数字当净重
+                const strictW = parseGS1Strict(valStr);
+                if (strictW !== null && strictW >= MIN && strictW <= MAX) return strictW;
+                // 后备: 模糊正则 (兼容某些非标准条码)
+                const gs1Regex = /(?:310([0-3])|320([0-3]))(\d{6})/g; let match;
+                while ((match = gs1Regex.exec(valStr)) !== null) {
+                    const value = parseInt(match[3]); let w = 0;
+                    if (match[1] !== undefined) { w = value / Math.pow(10, parseInt(match[1])); } 
+                    else if (match[2] !== undefined) { w = (value / Math.pow(10, parseInt(match[2]))) * 0.45359237; }
+                    if (w >= MIN && w <= MAX) return w;
+                }
+            }
+            if (appSettings.rules.uk) {
+                if (/^\d{42}$/.test(valStr)) { const w = parseInt(valStr.substring(16, 21))/100; if (w >= MIN && w <= MAX) return w; }
+            }
+            if (appSettings.rules.nz) {
+                if (/^\d{20}$/.test(valStr)) {
+                    if (valStr.substring(1, 6) === "07518") { const w = parseInt(valStr.substring(6, 9))/10; if (w >= MIN && w <= MAX) return w; }
+                }
+            }
+            return null; 
+        }
+
+        function backupData() {
+            if (historyStorage.length === 0) { showFeedback("No records", "error"); return; }
+            const backupObj = { version: "v36", timestamp: Date.now(), history: historyStorage, current: currentLogs, settings: appSettings };
+            const blob = new Blob([JSON.stringify(backupObj)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `WMS_BACKUP_${new Date().toISOString().slice(0,10)}.json`; document.body.appendChild(a); a.click(); document.body.removeChild(a); showFeedback("Backup downloaded", "success");
+        }
+        function processRestore(input) {
+            const file = input.files[0]; if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    if (data.history && Array.isArray(data.history)) {
+                        if(confirm(`恢复 ${data.history.length} 条记录？`)) {
+                            historyStorage = data.history; currentLogs = data.current || [];
+                            if(data.settings) { appSettings = data.settings; loadSettings(); }
+                            saveData(); renderUI(); showHistory(); showFeedback("恢复成功", "success");
+                        }
+                    } else { alert("无效文件"); }
+                } catch (err) { alert("解析失败"); }
+            };
+            reader.readAsText(file); input.value = ''; 
+        }
+        
+        function triggerSubmit() {
+            const input = document.getElementById('barcodeInput'); const val = input.value.replace(/\s/g, ''); 
+            if (!val) return; 
+            if (val.startsWith("00") && (val.length === 18 || val.length === 20)) { 
+                showFeedback("Carton code ignored", "warning"); playWarning(); 
+                if (navigator.vibrate) navigator.vibrate(200); 
+                input.value = ''; input.focus(); return; 
+            }
+            addWeight(val); 
+            input.value = ''; 
+            input.focus();
+        }
+
+        // ========================================
+        // 🎙️ 语音输入模块 (中文)
+        // ========================================
+        const CN_DIGITS = { '零':0, '〇':0, '○':0, 'O':0, 'o':0, '一':1, '幺':1, '壹':1, '二':2, '两':2, '俩':2, '贰':2, '三':3, '叁':3, '四':4, '肆':4, '五':5, '伍':5, '六':6, '陆':6, '七':7, '柒':7, '八':8, '捌':8, '九':9, '玖':9 };
+        const CN_UNITS = { '十':10, '拾':10, '百':100, '佰':100, '千':1000, '仟':1000, '万':10000, '亿':100000000 };
+        const CN_DOT_TOKENS = ['点点', '小数点', '点', '逗号', '．', '·', ',', '，'];
+        const CN_KG_RE = /\s*(?:公斤|千克|公克|克|kg|KG|Kg|kgs|KGS|公进|公斤数|千克数)\s*$/;
+
+        // === 同音/近音字 → 数字字 映射 (Chrome ASR 常见误识别) ===
+        const HOMOPHONE_MAP = {
+            // 零 (líng)
+            '灵':'零','凌':'零','林':'零','邻':'零','苓':'零','铃':'零','伶':'零','羚':'零',
+            // 一 (yī)
+            '衣':'一','医':'一','依':'一','已':'一','艺':'一','议':'一','意':'一','易':'一',
+            // 幺 (yāo)
+            '腰':'幺','妖':'幺','邀':'幺','要':'幺','吆':'幺','夭':'幺',
+            // 二 (èr)
+            '儿':'二','而':'二','耳':'二','尔':'二','饵':'二','迩':'二',
+            // 两 (liǎng)
+            '良':'两','凉':'两','量':'两','梁':'两','粮':'两',
+            // 三 (sān)
+            '散':'三','伞':'三','仨':'三',
+            // 四 (sì)
+            '是':'四','死':'四','思':'四','寺':'四','似':'四','私':'四','司':'四','丝':'四','撕':'四','斯':'四',
+            // 五 (wǔ)
+            '武':'五','屋':'五','无':'五','舞':'五','吴':'五','吾':'五','午':'五',
+            // 六 (liù)
+            '留':'六','流':'六','柳':'六','溜':'六','楼':'六',
+            // 七 (qī)
+            '妻':'七','期':'七','漆':'七','欺':'七','其':'七',
+            // 八 (bā)
+            '把':'八','巴':'八','吧':'八','疤':'八','罢':'八',
+            // 九 (jiǔ)
+            '酒':'九','久':'九','就':'九','舅':'九','救':'九','究':'九',
+            // 十 (shí)
+            '时':'十','食':'十','实':'十','史':'十','识':'十','使':'十','事':'十','试':'十','世':'十','室':'十',
+            // 点 (diǎn)
+            '店':'点','顶':'点','电':'点','甸':'点','淀':'点','玷':'点','垫':'点','奠':'点','惦':'点','碘':'点','典':'点',
+        };
+
+        // === 整词替换表 (ASR 因语言模型偏好把数字组合识别成常见词的情况) ===
+        // 必须在单字替换之前优先处理
+        const PHRASE_MAP = [
+            ['喝酒', '二九'],     // èr jiǔ → hē jiǔ (酒 同音)
+            ['我把', '五八'],     // wǔ bā → wǒ bǎ (近音)
+            ['衣酒', '一九'],
+            ['医酒', '一九'],
+            ['一就', '一九'],
+            ['三酒', '三九'],
+            ['把酒', '八九'],
+            ['吧酒', '八九'],
+            ['期吧', '七八'],
+            ['儿屋', '二五'],
+            ['二吴', '二五'],
+        ];
+
+        function _cleanHomophones(text) {
+            let s = text;
+            // 第一步: 整词替换 (必须先于单字替换)
+            for (const [bad, good] of PHRASE_MAP) {
+                if (s.indexOf(bad) !== -1) s = s.split(bad).join(good);
+            }
+            // 第二步: 单字同音替换
+            let out = '';
+            for (const c of s) {
+                out += (HOMOPHONE_MAP[c] !== undefined) ? HOMOPHONE_MAP[c] : c;
+            }
+            return out;
+        }
+
+        function _normalizeDot(text) {
+            let s = text;
+            for (const d of CN_DOT_TOKENS) { s = s.split(d).join('.'); }
+            return s;
+        }
+
+        // 中文识别歧义校正:
+        // "十" / "X十" 在尾部容易被听漏 "四", 优先校正为 "X十四"
+        // 仅当整数部分为 "十" / "一十" / "幺十" / "二十" / "两十" 等极短形式时触发
+        // 20.xx 必须用 "二零点xx" 表达, 10.xx 必须用 "一零点xx" / "幺零点xx"
+        function _disambiguateShi(intPart) {
+            if (intPart === '十' || intPart === '拾') return intPart + '四';
+            if (intPart === '一十' || intPart === '幺十' || intPart === '壹十') return intPart + '四';
+            if (intPart === '二十' || intPart === '两十' || intPart === '俩十' || intPart === '贰十') return intPart + '四';
+            return intPart;
+        }
+
+        function _parseChineseInteger(seg) {
+            seg = seg.trim();
+            if (!seg) return null;
+            if (/^\d+$/.test(seg)) return parseInt(seg, 10);
+            // 全部是单字数字 → 逐位拼接
+            if ([...seg].every(c => c in CN_DIGITS)) {
+                let s = ''; for (const c of seg) s += CN_DIGITS[c];
+                return parseInt(s, 10);
+            }
+            // 含中文单位
+            let total = 0, section = 0, current = 0, hasAny = false;
+            for (const c of seg) {
+                if (c in CN_DIGITS) { current = CN_DIGITS[c]; hasAny = true; }
+                else if (c in CN_UNITS) {
+                    const u = CN_UNITS[c]; hasAny = true;
+                    if (u === 10000 || u === 100000000) {
+                        section = (section + current) * u; total += section; section = 0; current = 0;
+                    } else {
+                        if (current === 0) current = 1;
+                        section += current * u; current = 0;
+                    }
+                } else if (/\s/.test(c)) { /* skip */ }
+                else { return null; }
+            }
+            total += section + current;
+            return hasAny ? total : null;
+        }
+
+        // 把语音识别文本转换为数字
+        function parseVoiceWeight(text) {
+            if (!text || typeof text !== 'string') return null;
+            let s = text.trim().replace(CN_KG_RE, '').trim();
+            s = s.replace(/[、,，]+/g, ' ').trim();
+            if (!s) return null;
+            // 同音字清洗 (NEW V47): "喝酒"→"二九", "屋"→"五" 等
+            s = _cleanHomophones(s);
+            s = _normalizeDot(s);
+            s = s.replace(/\.+/g, '.');
+
+            if (!s.includes('.')) {
+                const parts = s.split(/\s+/).filter(Boolean);
+                if (parts.length === 2 && /^\d+$/.test(parts[0]) && /^\d+$/.test(parts[1])) {
+                    s = parts[0] + '.' + parts[1];
+                } else if (parts.length === 1) {
+                    s = parts[0];
+                } else {
+                    s = parts.join('');
+                }
+            } else {
+                s = s.replace(/\s/g, '');
+            }
+
+            if (s.startsWith('.')) s = '0' + s;
+            if (s.endsWith('.')) s = s + '0';
+
+            let intPart, decPart;
+            if (s.includes('.')) {
+                const idx = s.indexOf('.');
+                intPart = s.substring(0, idx);
+                decPart = s.substring(idx + 1);
+            } else { intPart = s; decPart = ''; }
+
+            // 应用整数部分的中文歧义校正 (二十→二十四 等)
+            intPart = _disambiguateShi(intPart);
+
+            const intNum = _parseChineseInteger(intPart);
+            if (intNum === null) return null;
+            if (!decPart) return intNum;
+
+            let decStr = '';
+            if (/^\d+$/.test(decPart)) {
+                decStr = decPart;
+            } else {
+                for (const c of decPart) {
+                    if (c in CN_DIGITS) decStr += CN_DIGITS[c];
+                    else if (/\d/.test(c)) decStr += c;
+                    else if (/\s/.test(c)) continue;
+                    else return null;
+                }
+            }
+            if (!decStr) return intNum;
+            const result = parseFloat(intNum + '.' + decStr);
+            return Number.isFinite(result) ? result : null;
+        }
+
+        // === 语音识别状态 ===
+        let voiceRecognition = null;
+        let voiceListening = false;
+
+        function getSpeechRecognitionCtor() {
+            return window.SpeechRecognition || window.webkitSpeechRecognition || null;
+        }
+
+        function updateMicButtonVisibility() {
+            const btn = document.getElementById('micBtn');
+            if (!btn) return;
+            const supported = !!getSpeechRecognitionCtor();
+            const enabled = appSettings && appSettings.voiceEnabled;
+            btn.style.display = (supported && enabled) ? '' : 'none';
+        }
+
+        function showVoiceStatus(text, heardText) {
+            const el = document.getElementById('voiceStatus');
+            if (!el) return;
+            if (!text) { el.classList.remove('show'); el.innerHTML = ''; return; }
+            let html = text;
+            if (heardText) html += ` <span class="vs-heard">"${heardText}"</span>`;
+            el.innerHTML = html;
+            el.classList.add('show');
+        }
+
+        function startVoiceRecognition() {
+            const SR = getSpeechRecognitionCtor();
+            if (!SR) { showFeedback("浏览器不支持语音识别", "error"); return; }
+            if (voiceListening) return;
+
+            const continuous = appSettings.voiceMode === 'continuous';
+            voiceRecognition = new SR();
+            voiceRecognition.lang = 'zh-CN';
+            voiceRecognition.continuous = continuous;
+            voiceRecognition.interimResults = true;
+            voiceRecognition.maxAlternatives = 5;
+
+            const btn = document.getElementById('micBtn');
+            btn.classList.add('listening');
+            btn.textContent = '🔴';
+            voiceListening = true;
+            showVoiceStatus(continuous ? '🎙️ 持续聆听中... 再按一次停止' : '🎙️ 请说出重量数字...', '');
+            if (navigator.vibrate) navigator.vibrate(50);
+
+            voiceRecognition.onresult = (event) => {
+                let interim = '', finalText = '';
+                for (let i = event.resultIndex; i < event.results.length; i++) {
+                    const result = event.results[i];
+                    if (result.isFinal) {
+                        // 尝试所有候选, 选第一个能解析出数字的
+                        let parsed = null, chosen = null;
+                        for (let j = 0; j < result.length; j++) {
+                            const alt = result[j].transcript;
+                            const w = parseVoiceWeight(alt);
+                            if (w !== null && Number.isFinite(w) && w > 0) { parsed = w; chosen = alt; break; }
+                        }
+                        if (parsed === null) {
+                            chosen = result[0].transcript;
+                        }
+                        finalText += chosen;
+                        if (parsed !== null) {
+                            // 直接走 addWeight (会经 parseBarcodeValue 二次验证)
+                            const input = document.getElementById('barcodeInput');
+                            // 转成纯数字字符串, 让 parseBarcodeValue 处理
+                            input.value = String(parsed);
+                            showVoiceStatus(`✓ 识别成功:`, `${chosen.trim()} → ${parsed}`);
+                            triggerSubmit();
+                            if (!continuous) {
+                                stopVoiceRecognition();
+                                return;
+                            }
+                        } else {
+                            showVoiceStatus(`⚠️ 无法解析:`, chosen.trim());
+                            playWarning();
+                        }
+                    } else {
+                        interim += result[0].transcript;
+                    }
+                }
+                if (interim && !finalText) {
+                    showVoiceStatus('🎙️ 听到:', interim);
+                }
+            };
+
+            voiceRecognition.onerror = (event) => {
+                let msg = '语音识别错误';
+                switch(event.error) {
+                    case 'no-speech': msg = '未检测到语音'; break;
+                    case 'audio-capture': msg = '麦克风不可用'; break;
+                    case 'not-allowed': msg = '麦克风权限被拒绝'; break;
+                    case 'network': msg = '网络错误 (语音识别需联网)'; break;
+                    case 'aborted': return; // 用户主动停止, 不报错
+                }
+                showFeedback(msg, 'error');
+                stopVoiceRecognition();
+            };
+
+            voiceRecognition.onend = () => {
+                // 在 continuous 模式下若仍标记为聆听, 自动重启 (有些浏览器会在静默后自动结束)
+                if (voiceListening && continuous) {
+                    try { voiceRecognition.start(); return; } catch(e) { /* ignore */ }
+                }
+                stopVoiceRecognition();
+            };
+
+            try {
+                voiceRecognition.start();
+            } catch (e) {
+                console.error('voice start failed', e);
+                showFeedback('启动语音失败', 'error');
+                stopVoiceRecognition();
+            }
+        }
+
+        function stopVoiceRecognition() {
+            voiceListening = false;
+            if (voiceRecognition) {
+                try { voiceRecognition.stop(); } catch(e) {}
+                try { voiceRecognition.abort(); } catch(e) {}
+                voiceRecognition = null;
+            }
+            const btn = document.getElementById('micBtn');
+            if (btn) {
+                btn.classList.remove('listening');
+                btn.textContent = '🎙️';
+            }
+            // 2 秒后清掉状态条
+            setTimeout(() => { showVoiceStatus(''); }, 2000);
+        }
+
+        function toggleVoiceInput() {
+            if (!appSettings.voiceEnabled) {
+                showFeedback("语音输入已在设置中关闭", "warning");
+                return;
+            }
+            if (voiceListening) {
+                stopVoiceRecognition();
+            } else {
+                startVoiceRecognition();
+            }
+        }
+        
+        function fmt(n) { let s = n.toFixed(3); return s.endsWith('0') ? n.toFixed(2) : s; }
+        function showFeedback(msg, type) {
+            const el = document.getElementById('toastMsg'); el.textContent = msg; if (type === 'success') el.className = 'toast-success'; else if (type === 'warning') el.className = 'toast-warning'; else el.className = 'toast-error';
+            el.style.display = 'block'; if (type === 'success') { playSuccess(); if (navigator.vibrate) navigator.vibrate(100); } else if (type === 'error') { playError(); if (navigator.vibrate) navigator.vibrate([100, 50, 100]); } setTimeout(() => { el.style.display = 'none'; }, 1500);
+        }
+        function addWeight(val) {
+            if (viewingHistoryId) { showFeedback("Exit history mode first", "error"); return; }
+            const weight = parseBarcodeValue(val);
+            if (weight === null || isNaN(weight)) { showFeedback("Invalid or filtered", "error"); return; }
+            showFeedback(`OK ${fmt(weight)} kg`, "success"); currentLogs.push({ id: Date.now(), weight: weight }); saveData(); renderUI(); flashScreen();
+        }
+        function saveAndNew() {
+            if (currentLogs.length === 0) return;
+            const pallet = document.getElementById('palletInput').value; const product = document.getElementById('productInput').value;
+            if(!confirm(`Save ${currentLogs.length} records?\nPallet: ${pallet || 'N/A'}\nProduct: ${product || 'N/A'}`)) return;
+            historyStorage.unshift({ id: Date.now(), time: new Date().toLocaleString(), logs: [...currentLogs], total: currentLogs.reduce((a,b)=>a+b.weight,0), count: currentLogs.length, pallet: pallet, product: product });
+            currentLogs = []; document.getElementById('palletInput').value = ''; saveData(); renderUI(); showFeedback("Saved", "success"); setTimeout(()=>document.getElementById('palletInput').focus(), 100); 
+        }
+        function clearCurrent() { if(!viewingHistoryId && confirm("Clear current list?")) { currentLogs = []; saveData(); renderUI(); } }
+        function exportToExcel() {
+            if (historyStorage.length === 0) { showFeedback("No records", "error"); return; }
+            // 如果历史弹窗打开，导出筛选后的结果；否则导出全部
+            const modalOpen = document.getElementById('historyModal').style.display === 'flex';
+            const exportList = modalOpen ? getFilteredHistory() : historyStorage;
+            if (exportList.length === 0) { showFeedback("没有匹配记录可导出", "error"); return; }
+            let csv = "\uFEFF时间,板号,货名,总净重,总件数,明细\n";
+            exportList.forEach(i => { let details = i.logs.map(l => fmt(l.weight)).join("|"); let time = (i.time || '').replace(/,/g, " "); csv += `${time},${i.pallet || ''},${i.product || ''},${fmt(i.total)},${i.count},"${details}"\n`; });
+            const link = document.createElement("a"); link.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' })); link.download = `WMS_Export_${new Date().toISOString().slice(0,10)}.csv`; document.body.appendChild(link); link.click(); document.body.removeChild(link);
+            showFeedback(`已导出 ${exportList.length} 条`, "success");
+        }
+
+        function generatePrintHTML(logs, total, count, pallet, product) {
+            const fs = appSettings.printFontSize || 12;
+            const items = logs.map((l, i) => {
+                return `<div class="batch-item" style="font-size:${fs}pt">
+                            <span style="display:inline-block; width:35px; color:#666; font-size:0.9em;">#${i+1}</span>
+                            <span>${fmt(l.weight)}</span>
+                        </div>`;
+            }).join('');
+
+            const pInfo = pallet ? `<div><span class="pallet-num">${pallet}</span></div>` : '';
+            const prodInfo = product ? `<div><span>${product}</span></div>` : '';
+            return `<div class="batch-record">
+                        <div class="batch-header">${pInfo}${prodInfo}</div>
+                        <div class="batch-list">${items}</div>
+                        <div class="batch-footer">
+                            <div class="footer-totals">
+                                <div class="summary-row"><span class="s-label">Total: </span><span class="s-val">${fmt(total)}<span class="s-unit">kg</span></span></div>
+                                <div class="summary-row"><span class="s-label">Count: </span><span class="s-val">${count}<span class="s-unit">件</span></span></div>
+                            </div>
+                        </div>
+                    </div>`;
+        }
+
+        function doPrintCurrent() {
+            document.getElementById('batchPrintContainer').innerHTML = '';
+            let d = currentLogs, t = 0, c = 0, p = '', n = '';
+            if (viewingHistoryId) { const r = historyStorage.find(i => i.id === viewingHistoryId); if(r) { d=r.logs; t=r.total; c=r.count; p=r.pallet; n=r.product; } } 
+            else { t = currentLogs.reduce((a,b)=>a+b.weight,0); c = currentLogs.length; p = document.getElementById('palletInput').value; n = document.getElementById('productInput').value; }
+            document.getElementById('batchPrintContainer').innerHTML = generatePrintHTML(d, t, c, p, n);
+            window.print();
+        }
+        
+        function printSelectedBatch() {
+            const cbs = document.querySelectorAll('.hist-check:checked');
+            if (cbs.length === 0) { showFeedback("Please select records", "error"); return; }
+            
+            const ids = Array.from(cbs).map(cb => parseInt(cb.value)); 
+            const recs = historyStorage.filter(r => ids.includes(r.id));
+            const con = document.getElementById('batchPrintContainer'); 
+            con.innerHTML = '';
+            
+            recs.forEach(r => { con.innerHTML += generatePrintHTML(r.logs, r.total, r.count, r.pallet, r.product); }); 
+            window.print();
+
+            document.querySelectorAll('.hist-check').forEach(cb => cb.checked = false);
+        }
+
+        // ========================================
+        // 📄 PDF 下载功能 (按需加载 html2pdf.js)
+        // ========================================
+        let _html2pdfLoading = null;
+        function loadHtml2Pdf() {
+            if (window.html2pdf) return Promise.resolve(window.html2pdf);
+            if (_html2pdfLoading) return _html2pdfLoading;
+            _html2pdfLoading = new Promise((resolve, reject) => {
+                const s = document.createElement('script');
+                s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';
+                s.onload = () => resolve(window.html2pdf);
+                s.onerror = () => { _html2pdfLoading = null; reject(new Error('CDN load failed')); };
+                document.head.appendChild(s);
+                // 超时保护
+                setTimeout(() => {
+                    if (!window.html2pdf) { _html2pdfLoading = null; reject(new Error('Timeout')); }
+                }, 15000);
+            });
+            return _html2pdfLoading;
+        }
+
+        function downloadSelectedPDF() {
+            const cbs = document.querySelectorAll('.hist-check:checked');
+            if (cbs.length === 0) { showFeedback("请先勾选记录", "error"); return; }
+
+            const ids = Array.from(cbs).map(cb => parseInt(cb.value));
+            const recs = historyStorage.filter(r => ids.includes(r.id));
+            if (recs.length === 0) { showFeedback("无有效记录", "error"); return; }
+
+            showFeedback("正在生成 PDF...", "warning");
+
+            loadHtml2Pdf().then(html2pdf => {
+                // 构建临时容器，用打印样式
+                const wrap = document.createElement('div');
+                wrap.style.cssText = 'position:fixed; left:-9999px; top:0; width:210mm; background:#fff; padding:10mm; box-sizing:border-box; font-family:monospace; color:#000;';
+                let html = '';
+                recs.forEach(r => { html += generatePrintHTML(r.logs, r.total, r.count, r.pallet, r.product); });
+                // 给每条记录设宽度，模拟5列网格
+                wrap.innerHTML = `
+                    <style>
+                        .pdf-grid { display:flex; flex-wrap:wrap; gap:4px; align-items:stretch; }
+                        .pdf-grid .batch-record { flex: 0 0 calc(20% - 4px); min-width: calc(20% - 4px); border:1px solid #000; box-sizing:border-box; padding:4px; display:flex; flex-direction:column; page-break-inside:avoid; break-inside:avoid; }
+                        .pdf-grid .batch-header { border-bottom:1px solid #000; padding-bottom:4px; margin-bottom:4px; font-size:10pt; font-weight:bold; line-height:1.2; word-break:break-word; }
+                        .pdf-grid .batch-list { flex:1; margin-bottom:6px; }
+                        .pdf-grid .batch-item { display:block; width:100%; text-align:left; white-space:nowrap; line-height:1.25; break-inside:avoid; }
+                        .pdf-grid .batch-footer { border-top:1px solid #000; padding-top:4px; margin-top:auto; }
+                        .pdf-grid .footer-totals { text-align:right; line-height:1.4; }
+                        .pdf-grid .s-label { font-size:10pt; font-weight:bold; }
+                        .pdf-grid .s-val { font-size:12pt; font-weight:bold; }
+                        .pdf-grid .s-unit { font-size:10pt; font-weight:normal; }
+                    </style>
+                    <div class="pdf-grid">${html}</div>
+                `;
+                document.body.appendChild(wrap);
+
+                const filename = `WMS_${new Date().toISOString().slice(0,10)}_${recs.length}records.pdf`;
+                const opt = {
+                    margin:       [8, 8, 8, 8],
+                    filename:     filename,
+                    image:        { type: 'jpeg', quality: 0.95 },
+                    html2canvas:  { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
+                    jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' },
+                    pagebreak:    { mode: ['css', 'legacy'] }
+                };
+
+                return html2pdf().set(opt).from(wrap).save().then(() => {
+                    document.body.removeChild(wrap);
+                    showFeedback(`PDF 已下载 (${recs.length}条)`, "success");
+                    document.querySelectorAll('.hist-check').forEach(cb => cb.checked = false);
+                }).catch(err => {
+                    document.body.removeChild(wrap);
+                    throw err;
+                });
+            }).catch(err => {
+                console.error('PDF generation failed:', err);
+                // 降级: 使用浏览器原生打印功能, 引导用户"另存为 PDF"
+                if (confirm("PDF 库加载失败 (可能离线)。\n\n是否使用浏览器打印对话框中的【另存为PDF】功能?\n\n点击确定 → 打印对话框中选择【另存为PDF】 → 保存。")) {
+                    const con = document.getElementById('batchPrintContainer');
+                    con.innerHTML = '';
+                    recs.forEach(r => { con.innerHTML += generatePrintHTML(r.logs, r.total, r.count, r.pallet, r.product); });
+                    window.print();
+                    document.querySelectorAll('.hist-check').forEach(cb => cb.checked = false);
+                }
+            });
+        }
+
+        function toggleSelectAll() {
+            const cbs = document.querySelectorAll('.hist-check');
+            if (cbs.length === 0) return;
+            const allChecked = Array.from(cbs).every(cb => cb.checked);
+            cbs.forEach(cb => cb.checked = !allChecked);
+        }
+
+        // 搜索 / 排序 - 获取过滤后的历史
+        function getFilteredHistory() {
+            const kw = (document.getElementById('histSearchInput')?.value || '').trim().toLowerCase();
+            const sortBy = document.getElementById('histSortBy')?.value || 'time_desc';
+
+            let list = historyStorage.slice();
+
+            // 关键字搜索 (板号 / 货名 / 时间)
+            if (kw) {
+                list = list.filter(i =>
+                    (i.pallet || '').toLowerCase().includes(kw) ||
+                    (i.product || '').toLowerCase().includes(kw) ||
+                    (i.time || '').toLowerCase().includes(kw)
+                );
+            }
+
+            // 排序
+            const cmp = {
+                time_desc:    (a,b) => b.id - a.id,
+                time_asc:     (a,b) => a.id - b.id,
+                pallet_asc:   (a,b) => (a.pallet||'').localeCompare(b.pallet||''),
+                product_asc:  (a,b) => (a.product||'').localeCompare(b.product||''),
+            }[sortBy] || ((a,b) => b.id - a.id);
+            list.sort(cmp);
+
+            return list;
+        }
+
+        function clearHistFilters() {
+            const s = document.getElementById('histSearchInput'); if (s) s.value = '';
+            const sb = document.getElementById('histSortBy'); if (sb) sb.value = 'time_desc';
+            renderHistoryList();
+        }
+
+        function renderHistoryList() {
+            const listBody = document.getElementById('historyListBody');
+            const statsEl = document.getElementById('histStatsRow');
+            if (!listBody) return;
+
+            if (historyStorage.length === 0) {
+                listBody.innerHTML = '<div style="padding:20px;text-align:center;color:#999;">暂无记录</div>';
+                if (statsEl) statsEl.innerHTML = '';
+                return;
+            }
+
+            const filtered = getFilteredHistory();
+
+            if (statsEl) {
+                const totalKg = filtered.reduce((a,b) => a + (b.total || 0), 0);
+                const totalCnt = filtered.reduce((a,b) => a + (b.count || 0), 0);
+                statsEl.innerHTML = '显示 <b>' + filtered.length + '</b> / ' + historyStorage.length + ' 条 · 总重 <b>' + fmt(totalKg) + '</b> kg · 共 <b>' + totalCnt + '</b> 件';
+            }
+
+            if (filtered.length === 0) {
+                listBody.innerHTML = '<div style="padding:20px;text-align:center;color:#999;">没有匹配的记录</div>';
+                return;
+            }
+
+            listBody.innerHTML = filtered.map(item => `
+                <div class="history-item" style="display:flex; justify-content:space-between; align-items:center; padding:10px; border-bottom:1px solid #eee; background:#fff; color:#333;">
+                    <input type="checkbox" class="hist-check" value="${item.id}" style="width:20px;height:20px;margin-right:10px;">
+                    <div class="history-info" onclick="toggleItemCheck(${item.id})" style="flex:1; color:#333;">
+                        <div style="font-size:14px; color:#333;"><span style="font-weight:bold;color:#0062E6">${item.pallet ? '#' + item.pallet : ''}</span> <span style="color:#333;">${item.product || '未命名'}</span></div>
+                        <div style="font-size:13px;color:#333;margin-top:4px;">${fmt(item.total)} kg (${item.count}件)</div>
+                        <div style="font-size:11px;color:#999;margin-top:2px;">${item.time}</div>
+                    </div>
+                    <button class="btn-mini btn-view" onclick="loadHistoryView(${item.id})" style="background:#e9ecef; color:#333; border:none; padding:6px 12px; border-radius:4px; font-size:12px;">查看</button>
+                </div>
+            `).join('');
+        }
+
+        function showHistory() {
+            document.getElementById('historyModal').style.display = 'flex';
+            renderHistoryList();
+        }
+        
+        function toggleItemCheck(id) { 
+            const cb = document.querySelector(`.hist-check[value="${id}"]`); 
+            if(cb) cb.checked = !cb.checked; 
+        }
+
+        function closeHistory() { document.getElementById('historyModal').style.display = 'none'; }
+        function deleteSelected() { const cbs = document.querySelectorAll('.hist-check:checked'); if (cbs.length === 0) return; if(!confirm(`删除 ${cbs.length} 条？`)) return; const ids = Array.from(cbs).map(cb => parseInt(cb.value)); historyStorage = historyStorage.filter(i => !ids.includes(i.id)); saveData(); showHistory(); }
+        function loadHistoryView(id) { viewingHistoryId = id; closeHistory(); renderUI(); }
+        function exitHistoryView() { viewingHistoryId = null; renderUI(); } 
+        function renderUI() {
+            let d = currentLogs, isHist = !!viewingHistoryId; let currentPallet = '', currentProduct = '';
+            if (isHist) { const r = historyStorage.find(i => i.id === viewingHistoryId); if(r) { d = r.logs; currentPallet = r.pallet; currentProduct = r.product; } }
+            const t = d.reduce((a,b)=>a+b.weight,0), c = d.length;
+            document.getElementById('displayTotal').textContent = fmt(t); document.getElementById('displayCount').textContent = c;
+            const dash = document.querySelector('.dashboard'), tag = document.getElementById('historyTag');
+            if (isHist) { dash.classList.add('history-mode'); tag.style.display='block'; tag.innerHTML = `📜 正在查看历史记录: ${currentPallet ? '#'+currentPallet : ''} ${currentProduct}`; document.getElementById('mainBtns').style.display='none'; document.getElementById('historyViewBtns').style.display='grid'; document.querySelector('.input-group').style.display='none'; document.querySelector('.meta-input-group').style.display='none'; } 
+            else { dash.classList.remove('history-mode'); tag.style.display='none'; document.getElementById('mainBtns').style.display='grid'; document.getElementById('historyViewBtns').style.display='none'; document.querySelector('.input-group').style.display='flex'; document.querySelector('.meta-input-group').style.display='flex'; }
+            document.getElementById('dataList').innerHTML = [...d].reverse().map((item, i) => `<li class="list-item"><span class="item-index">#${c-i}</span><span class="item-weight">${fmt(item.weight)}</span><span class="item-action">${!isHist?`<button class="btn-delete" onclick="deleteItem(${item.id})">删</button>`:''}</span></li>`).join('');
+        }
+        function deleteItem(id) { if(confirm('删除?')) { currentLogs=currentLogs.filter(i=>i.id!==id); saveData(); renderUI(); } }
+        function flashScreen() { const el=document.getElementById('flashArea'); el.classList.add('scan-success-anim'); setTimeout(()=>el.classList.remove('scan-success-anim'),500); }
+        function focusInput() { setTimeout(()=>document.getElementById('barcodeInput').focus(),100); }
+        function saveData() { localStorage.setItem(KEY_CURRENT, JSON.stringify(currentLogs)); localStorage.setItem(KEY_HISTORY, JSON.stringify(historyStorage)); }
+        function loadData() { 
+            const c=localStorage.getItem(KEY_CURRENT), h=localStorage.getItem(KEY_HISTORY); 
+            if(c) currentLogs=JSON.parse(c); if(h) historyStorage=JSON.parse(h); 
+            if(!h) { const old = localStorage.getItem('wms_hist_v35'); if(old) historyStorage = JSON.parse(old); }
+        }
+    </script>
+</body>
+</html>
+
+
+
+
+
+
